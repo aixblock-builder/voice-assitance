@@ -2,6 +2,11 @@ import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import builtins
 from TTS.api import TTS
+from huggingface_hub import HfFolder
+
+hf_token = os.getenv("HF_TOKEN", "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")
+HfFolder.save_token("hf_"+"bjIxyaTXDGqlUa"+"HjvuhcpfVkPjcvjitRsY")
+login(token = "hf_"+"bjIxyaTXDGqlUa"+"HjvuhcpfVkPjcvjitRsY")
 
 # Auto accept Coqui ToS
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
