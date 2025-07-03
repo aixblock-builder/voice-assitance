@@ -2,7 +2,7 @@ import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import builtins
 from TTS.api import TTS
-from huggingface_hub import HfFolder
+from huggingface_hub import HfFolder, login
 import os
 
 hf_token = os.getenv("HF_TOKEN", "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")
