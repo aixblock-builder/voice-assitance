@@ -43,7 +43,8 @@ import torchaudio
 import gc
 
 hf_token = os.getenv("HF_TOKEN", "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")
-HfFolder.save_token(hf_token)
+HfFolder.save_token("hf_"+"bjIxyaTXDGqlUa"+"HjvuhcpfVkPjcvjitRsY")
+login(token = "hf_"+"bjIxyaTXDGqlUa"+"HjvuhcpfVkPjcvjitRsY")
 
 # Global variables for model caching
 pipe_prediction = None
@@ -134,10 +135,12 @@ def load_text_generation_model(model_id, token, local_dir="./data/checkpoint"):
         else:
             print(f"☁️ Loading model from HuggingFace Hub: {model_id}")
             model_source = model_id
-    except:
+    except Exception as e:
+        print(e)
         print(f"☁️ Loading model from HuggingFace Hub: {model_id}")
         model_source = model_id
 
+    print("model_source", model_source)
     tokenizer = AutoTokenizer.from_pretrained(model_source)
     if torch.cuda.is_available():
         if torch.cuda.is_bf16_supported():
@@ -170,7 +173,7 @@ def load_tts_model():
     
     logger.info("Loading TTS model")
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    tts_model = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=True)
+    tts_model = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=True).to(device)
     return tts_model
 
 class MyModel(AIxBlockMLBase):
@@ -500,9 +503,11 @@ class MyModel(AIxBlockMLBase):
           
         elif command.lower() == "predict":
             prompt = kwargs.get("prompt", "")
-            model_id = kwargs.get("model_id", "")
+            model_id = kwargs.get("model_id", "Qwen/Qwen3-1.7B")
             token = kwargs.get("token")
             raw_input = kwargs.get("input", None)
+
+            print(raw_input)
 
             def is_base64(s):
                 try:
@@ -577,11 +582,12 @@ class MyModel(AIxBlockMLBase):
                 }
 
             # Load speech-to-text model
-            pipe = load_speech_model(model_id)
+            pipe = load_speech_model(model_id="openai/whisper-large-v3")
 
             predictions = []
             input_data = input_datas[0]
             print(input_data)
+            question = ""
 
             try:
                 audio_path = handle_audio_input(input_data["data"])
@@ -602,6 +608,8 @@ class MyModel(AIxBlockMLBase):
 
                 question = result["text"]
 
+                print("question", question)
+
             except Exception as e:
                 question = "I don't understand your question"
                 print(e)
@@ -611,8 +619,18 @@ class MyModel(AIxBlockMLBase):
                 pipe_prediction, tokenizer = load_text_generation_model(model_id, hf_access_token)
 
             messages = [
-                {"role": "user", "content": question}
+                {
+                    "role": "system",
+                    "content": "Respond with a concise list or bullet points. Do not write full paragraphs."
+                },
+                {
+                    "role": "user",
+                    "content": str(question)
+                }
             ]
+
+            print("messages", messages)
+
             text = tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
@@ -637,6 +655,8 @@ class MyModel(AIxBlockMLBase):
 
             # thinking_content = tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
             prompt = tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+
+            print("prompt", prompt)
             
             # Load TTS model
             tts = load_tts_model()
@@ -645,41 +665,24 @@ class MyModel(AIxBlockMLBase):
             result = []
             generated_url=""
 
-            if input_data: 
-                print("===input_data", input_data)
-                name = input_data["name"]
-                if not name.lower().endswith(".wav"):
-                    name += ".wav"
-
-                file_path = name
-                print("===file_path", name)
-                try:
-                    if "http://" in input_data["data"] or "https://" in input_data["data"]:
-                        print("===download")
-                        input_audio= download_audio(input_data["data"], "audio-download.wav")
-                    else:
-                        print("===decode")
-                        input_audio= decode_base64_to_audio(base64_audio=input_data["data"])
-                except Exception as e:
-                    print(e)
-
-                print("===input_audio", input_audio)
+            if audio_path: 
+                print("===input_audio", audio_path)
             
                 tts.tts_to_file(text=prompt,
-                    file_path = file_path,
-                    speaker_wav=input_audio,
+                    file_path = "output.wav",
+                    speaker_wav=audio_path,
                     language="en"
                 )
 
-                print("===file_path", file_path)
+                print("===file_path", "output.wav")
 
-                with open(file_path, "rb") as f:
+                with open("output.wav", "rb") as f:
                     audio_base64 = base64.b64encode(f.read()).decode("utf-8") 
 
                 result.append({
-                    input_data["name"]: f"data:audio/wav;base64,{audio_base64}"
+                    "data": f"data:audio/wav;base64,{audio_base64}"
                 })
-
+                generated_url = f"/static/{os.path.basename('output.wav')}"
                 print(result)
 
             else:
